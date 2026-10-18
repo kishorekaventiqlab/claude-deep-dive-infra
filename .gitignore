@@ -1,0 +1,13 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+tfplan
+*.tfplan
+.env
+crash.log
+.DS_Store
+# Run outputs and evidence never live in this public repository; they go to the studio repository's evidence folders.
+*.log
+*.txt
+bootstrap/bootstrap-show.json
+bootstrap/bootstrap-outputs.json

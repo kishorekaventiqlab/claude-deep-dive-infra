@@ -1,0 +1,78 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "NoNewLongLivedCredentials",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateUser", "iam:CreateAccessKey", "iam:UpdateAccessKey", "iam:CreateLoginProfile",
+        "iam:UpdateLoginProfile", "iam:CreateServiceSpecificCredential", "iam:UploadSSHPublicKey",
+        "iam:UploadSigningCertificate", "iam:CreateVirtualMFADevice"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoPrivilegeEscalationThroughRoles",
+      "Effect": "Deny",
+      "Action": [
+        "iam:CreateRole", "iam:UpdateAssumeRolePolicy", "iam:PassRole", "iam:AttachRolePolicy",
+        "iam:PutRolePolicy", "iam:DeleteRolePolicy", "iam:DetachRolePolicy", "iam:PutRolePermissionsBoundary",
+        "iam:DeleteRolePermissionsBoundary", "iam:CreatePolicyVersion", "iam:SetDefaultPolicyVersion",
+        "iam:AddUserToGroup", "iam:CreateGroup", "iam:AttachGroupPolicy", "iam:PutGroupPolicy"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "GuardrailCannotBeRemovedBySelf",
+      "Effect": "Deny",
+      "Action": [
+        "iam:PutUserPolicy", "iam:DeleteUserPolicy", "iam:AttachUserPolicy", "iam:DetachUserPolicy",
+        "iam:PutUserPermissionsBoundary", "iam:DeleteUserPermissionsBoundary", "iam:DeleteUser"
+      ],
+      "Resource": "arn:aws:iam::593002483805:user/aventiqlab-sandbox-admin"
+    },
+    {
+      "Sid": "NoOrganizationAccountOrBillingChanges",
+      "Effect": "Deny",
+      "Action": [
+        "organizations:*", "account:*", "billing:*", "payments:*", "tax:*", "aws-portal:*",
+        "budgets:ModifyBudget", "budgets:CreateBudgetAction", "budgets:UpdateBudgetAction",
+        "budgets:DeleteBudgetAction", "budgets:ExecuteBudgetAction", "aws-marketplace:Subscribe"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoAuditTrailTampering",
+      "Effect": "Deny",
+      "Action": [
+        "cloudtrail:StopLogging", "cloudtrail:DeleteTrail", "cloudtrail:UpdateTrail",
+        "cloudtrail:PutEventSelectors", "cloudtrail:DeleteEventDataStore"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "NoComputeOrDataServiceCreationInPhaseB",
+      "Effect": "Deny",
+      "Action": [
+        "ec2:RunInstances", "ec2:RequestSpotInstances", "ec2:RequestSpotFleet", "ec2:CreateFleet",
+        "ec2:AllocateHosts", "ec2:PurchaseReservedInstancesOffering", "ec2:PurchaseScheduledInstances",
+        "rds:CreateDBInstance", "rds:CreateDBCluster", "eks:CreateCluster", "eks:CreateNodegroup",
+        "redshift:CreateCluster", "elasticache:CreateCacheCluster", "elasticache:CreateReplicationGroup",
+        "es:CreateDomain", "sagemaker:CreateNotebookInstance", "sagemaker:CreateEndpoint",
+        "sagemaker:CreateTrainingJob", "lightsail:CreateInstances"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "OnlyApSouth1ExceptGlobalServices",
+      "Effect": "Deny",
+      "NotAction": [
+        "iam:*", "sts:*", "organizations:*", "account:*", "budgets:*", "ce:*", "support:*", "health:*",
+        "trustedadvisor:*", "route53:*", "cloudfront:*", "waf:*", "wafv2:*", "shield:*", "globalaccelerator:*",
+        "s3:ListAllMyBuckets", "s3:GetAccountPublicAccessBlock", "access-analyzer:ValidatePolicy"
+      ],
+      "Resource": "*",
+      "Condition": {"StringNotEquals": {"aws:RequestedRegion": ["ap-south-1"]}}
+    }
+  ]
+}

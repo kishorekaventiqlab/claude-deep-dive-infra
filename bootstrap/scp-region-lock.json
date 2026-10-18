@@ -1,0 +1,12 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [{
+    "Sid": "DenyOutsideRegion",
+    "Effect": "Deny",
+    "NotAction": ["iam:*", "organizations:*", "sts:*", "budgets:*", "ce:*", "support:*", "account:*",
+                  "route53:*", "cloudfront:*", "waf:*", "wafv2:*", "shield:*", "globalaccelerator:*",
+                  "trustedadvisor:*", "health:*", "s3:GetAccountPublicAccessBlock", "s3:ListAllMyBuckets"],
+    "Resource": "*",
+    "Condition": {"StringNotEquals": {"aws:RequestedRegion": ["ap-south-1"]}}
+  }]
+}
