@@ -16,7 +16,7 @@ data "aws_vpc" "default" { default = true }
 
 locals {
   account  = data.aws_caller_identity.current.account_id
-  repo     = "repo:${var.github_owner}/${var.infra_repo}"
+  repo     = "repo:${var.github_owner}@${var.github_owner_id}/${var.infra_repo}@${var.infra_repo_id}"
   oidc_url = "token.actions.githubusercontent.com"
 }
 
