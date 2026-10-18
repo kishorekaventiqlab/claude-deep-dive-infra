@@ -1,0 +1,15 @@
+name: validate
+on: [push, pull_request]
+permissions: { contents: read }
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: "1.16.6", terraform_wrapper: false }
+      - run: terraform fmt -check -recursive
+      - run: cd bootstrap && terraform init -backend=false -input=false && terraform validate
+      - run: cd demo && terraform init -backend=false -input=false && terraform validate
+      - run: bash tests/test_verify_teardown.sh
+      - run: bash tests/test_add_only_gate.sh

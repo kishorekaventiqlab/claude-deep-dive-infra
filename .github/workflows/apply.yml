@@ -1,0 +1,64 @@
+name: apply
+on: workflow_dispatch
+permissions: { id-token: write, contents: read }
+env:
+  TF_IN_AUTOMATION: "1"
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    outputs:
+      plan_sha: ${{ steps.sum.outputs.sha }}
+    defaults: { run: { working-directory: demo } }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: "1.16.6", terraform_wrapper: false }
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with: { role-to-assume: "${{ vars.PLAN_ROLE_ARN }}", aws-region: "${{ vars.AWS_REGION }}" }
+      - run: terraform init -input=false -backend-config="bucket=${{ vars.STATE_BUCKET }}" -backend-config="region=${{ vars.AWS_REGION }}"
+      - run: terraform plan -input=false -out=tfplan
+      - run: terraform show -no-color tfplan
+      - name: Add-only gate (any update, replace or delete fails the job before approval is even requested)
+        run: |
+          terraform show -json tfplan > tfplan.json
+          bad=$(jq -r '[.resource_changes[] | select((.change.actions - ["create","no-op","read"]) | length > 0)
+                 | "\(.address): \(.change.actions | join(","))"] | .[]' tfplan.json)
+          if [ -n "$bad" ]; then echo "Refusing a non-additive plan:"; echo "$bad"; exit 1; fi
+          echo "add-only: $(jq '[.resource_changes[] | select(.change.actions == ["create"])] | length' tfplan.json) to create"
+          rm tfplan.json
+      - id: sum
+        run: echo "sha=$(sha256sum tfplan | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - name: Encrypt the plan before upload (artifacts of a public repository are public; D-024)
+        env: { TFPLAN_KEY: "${{ secrets.TFPLAN_KEY }}" }
+        run: |
+          test -n "$TFPLAN_KEY" || { echo "TFPLAN_KEY secret missing"; exit 1; }
+          gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 --symmetric --cipher-algo AES256 \
+            -o tfplan.gpg tfplan 3<<<"$TFPLAN_KEY"
+          rm tfplan
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with: { name: tfplan, path: demo/tfplan.gpg, retention-days: 1 }
+  apply:
+    needs: plan
+    runs-on: ubuntu-latest
+    environment: sandbox
+    defaults: { run: { working-directory: demo } }
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with: { terraform_version: "1.16.6", terraform_wrapper: false }
+      - uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with: { role-to-assume: "${{ vars.DEPLOY_ROLE_ARN }}", aws-region: "${{ vars.AWS_REGION }}" }
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with: { name: tfplan, path: demo }
+      - name: Decrypt the plan
+        env: { TFPLAN_KEY: "${{ secrets.TFPLAN_KEY }}" }
+        run: gpg --batch --yes --pinentry-mode loopback --passphrase-fd 3 -o tfplan -d tfplan.gpg 3<<<"$TFPLAN_KEY"
+      - run: test "$(sha256sum tfplan | cut -d' ' -f1)" = "${{ needs.plan.outputs.plan_sha }}"
+      - run: terraform init -input=false -backend-config="bucket=${{ vars.STATE_BUCKET }}" -backend-config="region=${{ vars.AWS_REGION }}"
+      - name: Add-only gate, re-checked on the exact artifact being applied
+        run: |
+          bad=$(terraform show -json tfplan | jq -r '[.resource_changes[]
+                 | select((.change.actions - ["create","no-op","read"]) | length > 0) | .address] | .[]')
+          if [ -n "$bad" ]; then echo "Refusing a non-additive plan: $bad"; exit 1; fi
+      - run: terraform apply -input=false tfplan
